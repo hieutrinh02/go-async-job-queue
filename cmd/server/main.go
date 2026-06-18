@@ -39,6 +39,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+	// Wait for signal from channel
 	<-quit
 	log.Println("shutting down server...")
 
