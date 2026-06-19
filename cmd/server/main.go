@@ -11,6 +11,7 @@ import (
 
 	"github.com/hieutrinh02/go-async-job-queue/internal/api"
 	"github.com/hieutrinh02/go-async-job-queue/internal/config"
+	"github.com/hieutrinh02/go-async-job-queue/internal/db"
 )
 
 func main() {
@@ -18,6 +19,15 @@ func main() {
 	cfg := config.Load()
 	router := api.NewRouter()
 	addr := ":" + cfg.Port
+
+	// Database pool
+	ctx := context.Background()
+	dbPool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer dbPool.Close()
+	log.Println("connected to database")
 
 	// Create HTTP server
 	server := &http.Server{
@@ -44,11 +54,11 @@ func main() {
 	log.Println("shutting down server...")
 
 	// Create context timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel() // should be called just before main() exits
 
 	// Shutdown server
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Fatal(err)
 	}
 
