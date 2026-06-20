@@ -2,15 +2,28 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/hieutrinh02/go-async-job-queue/internal/store"
 )
 
-func NewRouter() http.Handler {
+type Server struct {
+	store *store.Store
+}
+
+func NewRouter(jobStore *store.Store) http.Handler {
+	server := &Server{
+		store: jobStore,
+	}
+
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	mux.HandleFunc("GET /healthz", server.handleHealthz)
+	mux.HandleFunc("POST /v1/jobs", server.handleCreateJob)
 
 	return mux
+}
+
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 }

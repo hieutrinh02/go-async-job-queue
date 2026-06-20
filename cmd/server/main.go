@@ -12,13 +12,12 @@ import (
 	"github.com/hieutrinh02/go-async-job-queue/internal/api"
 	"github.com/hieutrinh02/go-async-job-queue/internal/config"
 	"github.com/hieutrinh02/go-async-job-queue/internal/db"
+	"github.com/hieutrinh02/go-async-job-queue/internal/store"
 )
 
 func main() {
-	// Create config, router and address
+	// Create config
 	cfg := config.Load()
-	router := api.NewRouter()
-	addr := ":" + cfg.Port
 
 	// Database pool
 	ctx := context.Background()
@@ -28,6 +27,11 @@ func main() {
 	}
 	defer dbPool.Close()
 	log.Println("connected to database")
+
+	// Create router and address
+	jobStore := store.New(dbPool)
+	router := api.NewRouter(jobStore)
+	addr := ":" + cfg.Port
 
 	// Create HTTP server
 	server := &http.Server{
