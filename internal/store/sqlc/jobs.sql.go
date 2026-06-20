@@ -127,3 +127,30 @@ func (q *Queries) GetJob(ctx context.Context, id pgtype.UUID) (Job, error) {
 	)
 	return i, err
 }
+
+const getJobByIdempotencyKey = `-- name: GetJobByIdempotencyKey :one
+SELECT id, type, payload, status, attempt, max_attempts, run_at, locked_at, locked_by, last_error, idempotency_key, created_at, updated_at
+FROM jobs
+WHERE idempotency_key = $1
+`
+
+func (q *Queries) GetJobByIdempotencyKey(ctx context.Context, idempotencyKey pgtype.Text) (Job, error) {
+	row := q.db.QueryRow(ctx, getJobByIdempotencyKey, idempotencyKey)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Payload,
+		&i.Status,
+		&i.Attempt,
+		&i.MaxAttempts,
+		&i.RunAt,
+		&i.LockedAt,
+		&i.LockedBy,
+		&i.LastError,
+		&i.IdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

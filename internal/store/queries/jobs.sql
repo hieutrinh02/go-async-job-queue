@@ -24,6 +24,11 @@ SELECT *
 FROM jobs
 WHERE id = $1;
 
+-- name: GetJobByIdempotencyKey :one
+SELECT *
+FROM jobs
+WHERE idempotency_key = $1;
+
 -- name: CancelPendingJob :one
 UPDATE jobs
 SET

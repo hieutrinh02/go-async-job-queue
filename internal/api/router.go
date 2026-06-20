@@ -19,6 +19,8 @@ func NewRouter(jobStore *store.Store) http.Handler {
 
 	mux.HandleFunc("GET /healthz", server.handleHealthz)
 	mux.HandleFunc("POST /v1/jobs", server.handleCreateJob)
+	mux.HandleFunc("GET /v1/jobs/{id}", server.handleGetJob)
+	mux.HandleFunc("POST /v1/jobs/{id}/cancel", server.handleCancelJob)
 
 	return mux
 }

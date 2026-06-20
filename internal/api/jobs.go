@@ -54,9 +54,53 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		IdempotencyKey: req.IdempotencyKey,
 	})
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to create job")
+		existingJob, getErr := s.store.GetJobByIdempotencyKey(r.Context(), req.IdempotencyKey)
+		if getErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to create job")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, newJobResponse(existingJob))
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, newJobResponse(job))
+}
+
+func (s *Server) handleGetJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeJSONError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	job, err := s.store.GetJob(r.Context(), id)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newJobResponse(job))
+}
+
+func (s *Server) handleCancelJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeJSONError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	job, err := s.store.CancelPendingJob(r.Context(), id)
+	if err == nil {
+		writeJSON(w, http.StatusOK, newJobResponse(job))
+		return
+	}
+
+	_, getErr := s.store.GetJob(r.Context(), id)
+	if getErr != nil {
+		writeJSONError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	writeJSONError(w, http.StatusConflict, "only pending jobs can be cancelled")
 }

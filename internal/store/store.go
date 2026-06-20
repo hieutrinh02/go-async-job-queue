@@ -64,6 +64,15 @@ func (s *Store) GetJob(ctx context.Context, id string) (sqlc.Job, error) {
 	return s.queries.GetJob(ctx, jobID)
 }
 
+func (s *Store) GetJobByIdempotencyKey(ctx context.Context, idempotencyKey string) (sqlc.Job, error) {
+	key := pgtype.Text{
+		String: idempotencyKey,
+		Valid:  idempotencyKey != "",
+	}
+
+	return s.queries.GetJobByIdempotencyKey(ctx, key)
+}
+
 func (s *Store) CancelPendingJob(ctx context.Context, id string) (sqlc.Job, error) {
 	jobID := pgtype.UUID{}
 	if err := jobID.Scan(id); err != nil {
