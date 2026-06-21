@@ -23,6 +23,12 @@ type CreateJobParams struct {
 	IdempotencyKey string
 }
 
+type MarkJobFailedParams struct {
+	ID        string
+	NextRunAt time.Time
+	LastError string
+}
+
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{
 		queries: sqlc.New(pool),
@@ -96,4 +102,27 @@ func (s *Store) MarkJobSucceeded(ctx context.Context, id string) (sqlc.Job, erro
 	}
 
 	return s.queries.MarkJobSucceeded(ctx, jobID)
+}
+
+func (s *Store) MarkJobFailed(ctx context.Context, params MarkJobFailedParams) (sqlc.Job, error) {
+	jobID := pgtype.UUID{}
+	if err := jobID.Scan(params.ID); err != nil {
+		return sqlc.Job{}, err
+	}
+
+	nextRunAt := pgtype.Timestamptz{
+		Time:  params.NextRunAt,
+		Valid: true,
+	}
+
+	lastError := pgtype.Text{
+		String: params.LastError,
+		Valid:  params.LastError != "",
+	}
+
+	return s.queries.MarkJobFailed(ctx, sqlc.MarkJobFailedParams{
+		ID:        jobID,
+		RunAt:     nextRunAt,
+		LastError: lastError,
+	})
 }

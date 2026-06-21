@@ -68,3 +68,22 @@ SET
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- name: MarkJobFailed :one
+UPDATE jobs
+SET
+    attempt = attempt + 1,
+    status = CASE
+        WHEN attempt + 1 >= max_attempts THEN 'dead'
+        ELSE 'pending'
+    END,
+    run_at = CASE
+        WHEN attempt + 1 >= max_attempts THEN run_at
+        ELSE $2
+    END,
+    locked_at = NULL,
+    locked_by = NULL,
+    last_error = $3,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;

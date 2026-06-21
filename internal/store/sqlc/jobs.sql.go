@@ -215,6 +215,53 @@ func (q *Queries) GetJobByIdempotencyKey(ctx context.Context, idempotencyKey pgt
 	return i, err
 }
 
+const markJobFailed = `-- name: MarkJobFailed :one
+UPDATE jobs
+SET
+    attempt = attempt + 1,
+    status = CASE
+        WHEN attempt + 1 >= max_attempts THEN 'dead'
+        ELSE 'pending'
+    END,
+    run_at = CASE
+        WHEN attempt + 1 >= max_attempts THEN run_at
+        ELSE $2
+    END,
+    locked_at = NULL,
+    locked_by = NULL,
+    last_error = $3,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING id, type, payload, status, attempt, max_attempts, run_at, locked_at, locked_by, last_error, idempotency_key, created_at, updated_at
+`
+
+type MarkJobFailedParams struct {
+	ID        pgtype.UUID        `json:"id"`
+	RunAt     pgtype.Timestamptz `json:"run_at"`
+	LastError pgtype.Text        `json:"last_error"`
+}
+
+func (q *Queries) MarkJobFailed(ctx context.Context, arg MarkJobFailedParams) (Job, error) {
+	row := q.db.QueryRow(ctx, markJobFailed, arg.ID, arg.RunAt, arg.LastError)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Payload,
+		&i.Status,
+		&i.Attempt,
+		&i.MaxAttempts,
+		&i.RunAt,
+		&i.LockedAt,
+		&i.LockedBy,
+		&i.LastError,
+		&i.IdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const markJobSucceeded = `-- name: MarkJobSucceeded :one
 UPDATE jobs
 SET
