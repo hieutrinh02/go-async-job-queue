@@ -13,6 +13,7 @@ import (
 	"github.com/hieutrinh02/go-async-job-queue/internal/config"
 	"github.com/hieutrinh02/go-async-job-queue/internal/db"
 	"github.com/hieutrinh02/go-async-job-queue/internal/store"
+	"github.com/hieutrinh02/go-async-job-queue/internal/worker"
 )
 
 func main() {
@@ -28,8 +29,22 @@ func main() {
 	defer dbPool.Close()
 	log.Println("connected to database")
 
-	// Create router and address
+	// Create store
 	jobStore := store.New(dbPool)
+
+	// Create and start worker
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	defer stopWorker()
+
+	jobWorker := worker.New(jobStore, worker.Config{
+		ID:           "worker-1",
+		BatchSize:    10,
+		PollInterval: 2 * time.Second,
+	})
+
+	go jobWorker.Run(workerCtx)
+
+	// Create router and address
 	router := api.NewRouter(jobStore)
 	addr := ":" + cfg.Port
 
@@ -56,6 +71,9 @@ func main() {
 	// Wait for signal from channel
 	<-quit
 	log.Println("shutting down server...")
+
+	// Stop worker
+	stopWorker()
 
 	// Create context timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

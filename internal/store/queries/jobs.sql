@@ -37,3 +37,23 @@ SET
 WHERE id = $1
     AND status = 'pending'
 RETURNING *;
+
+-- name: ClaimJobs :many
+WITH selected_jobs AS (
+    SELECT id
+    FROM jobs
+    WHERE status = 'pending'
+        AND run_at <= NOW()
+    ORDER BY created_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT $1
+)
+UPDATE jobs
+SET
+    status = 'processing',
+    locked_at = NOW(),
+    locked_by = $2,
+    updated_at = NOW()
+FROM selected_jobs
+WHERE jobs.id = selected_jobs.id
+RETURNING jobs.*;

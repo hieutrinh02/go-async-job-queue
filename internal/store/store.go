@@ -81,3 +81,10 @@ func (s *Store) CancelPendingJob(ctx context.Context, id string) (sqlc.Job, erro
 
 	return s.queries.CancelPendingJob(ctx, jobID)
 }
+
+func (s *Store) ClaimJobs(ctx context.Context, limit int32, workerID string) ([]sqlc.Job, error) {
+	return s.queries.ClaimJobs(ctx, sqlc.ClaimJobsParams{
+		Limit:    limit,
+		LockedBy: pgtype.Text{String: workerID, Valid: workerID != ""},
+	})
+}

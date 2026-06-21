@@ -42,6 +42,66 @@ func (q *Queries) CancelPendingJob(ctx context.Context, id pgtype.UUID) (Job, er
 	return i, err
 }
 
+const claimJobs = `-- name: ClaimJobs :many
+WITH selected_jobs AS (
+    SELECT id
+    FROM jobs
+    WHERE status = 'pending'
+        AND run_at <= NOW()
+    ORDER BY created_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT $1
+)
+UPDATE jobs
+SET
+    status = 'processing',
+    locked_at = NOW(),
+    locked_by = $2,
+    updated_at = NOW()
+FROM selected_jobs
+WHERE jobs.id = selected_jobs.id
+RETURNING jobs.id, jobs.type, jobs.payload, jobs.status, jobs.attempt, jobs.max_attempts, jobs.run_at, jobs.locked_at, jobs.locked_by, jobs.last_error, jobs.idempotency_key, jobs.created_at, jobs.updated_at
+`
+
+type ClaimJobsParams struct {
+	Limit    int32       `json:"limit"`
+	LockedBy pgtype.Text `json:"locked_by"`
+}
+
+func (q *Queries) ClaimJobs(ctx context.Context, arg ClaimJobsParams) ([]Job, error) {
+	rows, err := q.db.Query(ctx, claimJobs, arg.Limit, arg.LockedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Job
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Payload,
+			&i.Status,
+			&i.Attempt,
+			&i.MaxAttempts,
+			&i.RunAt,
+			&i.LockedAt,
+			&i.LockedBy,
+			&i.LastError,
+			&i.IdempotencyKey,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createJob = `-- name: CreateJob :one
 INSERT INTO jobs (
     id,
