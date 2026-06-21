@@ -74,5 +74,19 @@ func (w *Worker) poll(ctx context.Context) {
 
 	for _, job := range jobs {
 		log.Printf("worker %s claimed job %s type=%s", w.id, job.ID.String(), job.Type)
+		w.processJob(ctx, job.ID.String(), job.Type)
 	}
+}
+
+func (w *Worker) processJob(ctx context.Context, jobID string, jobType string) {
+	log.Printf("worker %s processing job %s type=%s", w.id, jobID, jobType)
+
+	time.Sleep(500 * time.Millisecond)
+
+	if _, err := w.store.MarkJobSucceeded(ctx, jobID); err != nil {
+		log.Printf("worker %s failed to mark job %s succeeded: %v", w.id, jobID, err)
+		return
+	}
+
+	log.Printf("worker %s completed job %s", w.id, jobID)
 }

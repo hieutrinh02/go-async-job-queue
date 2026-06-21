@@ -57,3 +57,14 @@ SET
 FROM selected_jobs
 WHERE jobs.id = selected_jobs.id
 RETURNING jobs.*;
+
+-- name: MarkJobSucceeded :one
+UPDATE jobs
+SET
+    status = 'succeeded',
+    locked_at = NULL,
+    locked_by = NULL,
+    last_error = NULL,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;

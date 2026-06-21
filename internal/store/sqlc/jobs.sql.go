@@ -214,3 +214,36 @@ func (q *Queries) GetJobByIdempotencyKey(ctx context.Context, idempotencyKey pgt
 	)
 	return i, err
 }
+
+const markJobSucceeded = `-- name: MarkJobSucceeded :one
+UPDATE jobs
+SET
+    status = 'succeeded',
+    locked_at = NULL,
+    locked_by = NULL,
+    last_error = NULL,
+    updated_at = NOW()
+WHERE id = $1
+RETURNING id, type, payload, status, attempt, max_attempts, run_at, locked_at, locked_by, last_error, idempotency_key, created_at, updated_at
+`
+
+func (q *Queries) MarkJobSucceeded(ctx context.Context, id pgtype.UUID) (Job, error) {
+	row := q.db.QueryRow(ctx, markJobSucceeded, id)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Payload,
+		&i.Status,
+		&i.Attempt,
+		&i.MaxAttempts,
+		&i.RunAt,
+		&i.LockedAt,
+		&i.LockedBy,
+		&i.LastError,
+		&i.IdempotencyKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

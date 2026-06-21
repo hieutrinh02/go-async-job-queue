@@ -88,3 +88,12 @@ func (s *Store) ClaimJobs(ctx context.Context, limit int32, workerID string) ([]
 		LockedBy: pgtype.Text{String: workerID, Valid: workerID != ""},
 	})
 }
+
+func (s *Store) MarkJobSucceeded(ctx context.Context, id string) (sqlc.Job, error) {
+	jobID := pgtype.UUID{}
+	if err := jobID.Scan(id); err != nil {
+		return sqlc.Job{}, err
+	}
+
+	return s.queries.MarkJobSucceeded(ctx, jobID)
+}
