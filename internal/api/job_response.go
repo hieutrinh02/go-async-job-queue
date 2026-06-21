@@ -26,7 +26,8 @@ type jobResponse struct {
 func newJobResponse(job sqlc.Job) jobResponse {
 	var lockedAt *time.Time
 	if job.LockedAt.Valid {
-		lockedAt = &job.LockedAt.Time
+		t := job.LockedAt.Time.UTC()
+		lockedAt = &t
 	}
 
 	var lockedBy *string
@@ -51,12 +52,12 @@ func newJobResponse(job sqlc.Job) jobResponse {
 		Status:         job.Status,
 		Attempt:        job.Attempt,
 		MaxAttempts:    job.MaxAttempts,
-		RunAt:          job.RunAt.Time,
+		RunAt:          job.RunAt.Time.UTC(),
 		LockedAt:       lockedAt,
 		LockedBy:       lockedBy,
 		LastError:      lastError,
 		IdempotencyKey: idempotencyKey,
-		CreatedAt:      job.CreatedAt.Time,
-		UpdatedAt:      job.UpdatedAt.Time,
+		CreatedAt:      job.CreatedAt.Time.UTC(),
+		UpdatedAt:      job.UpdatedAt.Time.UTC(),
 	}
 }
