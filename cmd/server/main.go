@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -36,13 +37,17 @@ func main() {
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	defer stopWorker()
 
-	jobWorker := worker.New(jobStore, worker.Config{
-		ID:           "worker-1",
-		BatchSize:    10,
-		PollInterval: 2 * time.Second,
-	})
+	for i := 1; i <= cfg.WorkerCount; i++ {
+		jobWorker := worker.New(jobStore, worker.Config{
+			ID:           fmt.Sprintf("worker-%d", i),
+			BatchSize:    cfg.WorkerBatchSize,
+			PollInterval: cfg.WorkerPollInterval,
+		})
 
-	go jobWorker.Run(workerCtx)
+		go jobWorker.Run(workerCtx)
+	}
+
+	log.Printf("started %d worker(s)", cfg.WorkerCount)
 
 	// Create router and address
 	router := api.NewRouter(jobStore)
