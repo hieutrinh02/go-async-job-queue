@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/hieutrinh02/go-async-job-queue/internal/store"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Server struct {
@@ -18,6 +19,7 @@ func NewRouter(jobStore *store.Store) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", server.handleHealthz)
+	mux.Handle("GET /metrics", promhttp.Handler())
 	mux.HandleFunc("POST /v1/jobs", server.handleCreateJob)
 	mux.HandleFunc("GET /v1/jobs/{id}", server.handleGetJob)
 	mux.HandleFunc("POST /v1/jobs/{id}/cancel", server.handleCancelJob)

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hieutrinh02/go-async-job-queue/internal/metrics"
 	"github.com/hieutrinh02/go-async-job-queue/internal/store"
 )
 
@@ -64,6 +65,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	metrics.JobsSubmittedTotal.Inc()
 	writeJSON(w, http.StatusCreated, newJobResponse(job))
 }
 

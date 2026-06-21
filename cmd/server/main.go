@@ -14,13 +14,15 @@ import (
 	"github.com/hieutrinh02/go-async-job-queue/internal/api"
 	"github.com/hieutrinh02/go-async-job-queue/internal/config"
 	"github.com/hieutrinh02/go-async-job-queue/internal/db"
+	"github.com/hieutrinh02/go-async-job-queue/internal/metrics"
 	"github.com/hieutrinh02/go-async-job-queue/internal/store"
 	"github.com/hieutrinh02/go-async-job-queue/internal/worker"
 )
 
 func main() {
-	// Create config
+	// Create config and register metrics
 	cfg := config.Load()
+	metrics.Register()
 
 	// Database pool
 	ctx := context.Background()

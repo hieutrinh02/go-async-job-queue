@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/hieutrinh02/go-async-job-queue/internal/metrics"
 	"github.com/hieutrinh02/go-async-job-queue/internal/store"
 )
 
@@ -80,7 +81,17 @@ func (w *Worker) poll(ctx context.Context) {
 func (w *Worker) processJob(jobID string, jobType string, attempt int32) {
 	log.Printf("worker %s processing job %s type=%s", w.id, jobID, jobType)
 
+	metrics.JobsProcessing.Inc()
+	start := time.Now()
+
+	defer metrics.JobsProcessing.Dec()
+	defer func() {
+		metrics.JobExecutionDurationSeconds.Observe(time.Since(start).Seconds())
+	}()
+
 	if err := executeMockJob(jobType); err != nil {
+		metrics.JobsFailedTotal.Inc()
+
 		nextRunAt := time.Now().UTC().Add(retryBackoff(attempt))
 
 		markCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -96,6 +107,10 @@ func (w *Worker) processJob(jobID string, jobType string, attempt int32) {
 			return
 		}
 
+		if job.Status == "dead" {
+			metrics.JobsDeadTotal.Inc()
+		}
+
 		log.Printf("worker %s failed job %s status=%s attempt=%d error=%q", w.id, jobID, job.Status, job.Attempt, err.Error())
 		return
 	}
@@ -107,6 +122,8 @@ func (w *Worker) processJob(jobID string, jobType string, attempt int32) {
 		log.Printf("worker %s failed to mark job %s succeeded: %v", w.id, jobID, err)
 		return
 	}
+
+	metrics.JobsSucceededTotal.Inc()
 
 	log.Printf("worker %s completed job %s", w.id, jobID)
 }
