@@ -73,17 +73,20 @@ func (w *Worker) poll(ctx context.Context) {
 
 	for _, job := range jobs {
 		log.Printf("worker %s claimed job %s type=%s", w.id, job.ID.String(), job.Type)
-		w.processJob(ctx, job.ID.String(), job.Type, job.Attempt)
+		w.processJob(job.ID.String(), job.Type, job.Attempt)
 	}
 }
 
-func (w *Worker) processJob(ctx context.Context, jobID string, jobType string, attempt int32) {
+func (w *Worker) processJob(jobID string, jobType string, attempt int32) {
 	log.Printf("worker %s processing job %s type=%s", w.id, jobID, jobType)
 
-	if err := executeMockJob(ctx, jobType); err != nil {
+	if err := executeMockJob(jobType); err != nil {
 		nextRunAt := time.Now().UTC().Add(retryBackoff(attempt))
 
-		job, markErr := w.store.MarkJobFailed(ctx, store.MarkJobFailedParams{
+		markCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		job, markErr := w.store.MarkJobFailed(markCtx, store.MarkJobFailedParams{
 			ID:        jobID,
 			NextRunAt: nextRunAt,
 			LastError: err.Error(),
@@ -97,7 +100,10 @@ func (w *Worker) processJob(ctx context.Context, jobID string, jobType string, a
 		return
 	}
 
-	if _, err := w.store.MarkJobSucceeded(ctx, jobID); err != nil {
+	markCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := w.store.MarkJobSucceeded(markCtx, jobID); err != nil {
 		log.Printf("worker %s failed to mark job %s succeeded: %v", w.id, jobID, err)
 		return
 	}
@@ -118,33 +124,23 @@ func retryBackoff(attempt int32) time.Duration {
 	}
 }
 
-func executeMockJob(ctx context.Context, jobType string) error {
+func executeMockJob(jobType string) error {
 	switch jobType {
 	case "send_email":
-		if err := sleepWithContext(ctx, 300*time.Millisecond); err != nil {
-			return err
-		}
+		time.Sleep(300 * time.Millisecond)
 	case "generate_report":
-		if err := sleepWithContext(ctx, 700*time.Millisecond); err != nil {
-			return err
-		}
+		time.Sleep(700 * time.Millisecond)
 	case "webhook_delivery":
-		if err := sleepWithContext(ctx, 500*time.Millisecond); err != nil {
-			return err
-		}
+		time.Sleep(500 * time.Millisecond)
 	case "image_resize":
-		if err := sleepWithContext(ctx, 800*time.Millisecond); err != nil {
-			return err
-		}
+		time.Sleep(800 * time.Millisecond)
 	case "always_fail":
-		if err := sleepWithContext(ctx, 300*time.Millisecond); err != nil {
-			return err
-		}
+		time.Sleep(300 * time.Millisecond)
 		return errors.New("mock handler failed")
+	case "slow_job":
+		time.Sleep(1 * time.Minute)
 	default:
-		if err := sleepWithContext(ctx, 200*time.Millisecond); err != nil {
-			return err
-		}
+		time.Sleep(200 * time.Millisecond)
 		return errors.New("unknown job type")
 	}
 
@@ -153,16 +149,4 @@ func executeMockJob(ctx context.Context, jobType string) error {
 	}
 
 	return nil
-}
-
-func sleepWithContext(ctx context.Context, d time.Duration) error {
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }

@@ -9,11 +9,12 @@ import (
 )
 
 type Config struct {
-	Port               string
-	DatabaseURL        string
-	WorkerCount        int
-	WorkerBatchSize    int32
-	WorkerPollInterval time.Duration
+	Port                  string
+	DatabaseURL           string
+	WorkerCount           int
+	WorkerBatchSize       int32
+	WorkerPollInterval    time.Duration
+	WorkerShutdownTimeout time.Duration
 }
 
 func Load() Config {
@@ -32,13 +33,15 @@ func Load() Config {
 	workerCount := getEnvInt("WORKER_COUNT", 3)
 	workerBatchSize := getEnvInt("WORKER_BATCH_SIZE", 10)
 	workerPollInterval := getEnvDuration("WORKER_POLL_INTERVAL", 2*time.Second)
+	workerShutdownTimeout := getEnvDuration("WORKER_SHUTDOWN_TIMEOUT", 30*time.Second)
 
 	return Config{
-		Port:               port,
-		DatabaseURL:        databaseURL,
-		WorkerCount:        workerCount,
-		WorkerBatchSize:    int32(workerBatchSize),
-		WorkerPollInterval: workerPollInterval,
+		Port:                  port,
+		DatabaseURL:           databaseURL,
+		WorkerCount:           workerCount,
+		WorkerBatchSize:       int32(workerBatchSize),
+		WorkerPollInterval:    workerPollInterval,
+		WorkerShutdownTimeout: workerShutdownTimeout,
 	}
 }
 

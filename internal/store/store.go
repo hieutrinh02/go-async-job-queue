@@ -126,3 +126,10 @@ func (s *Store) MarkJobFailed(ctx context.Context, params MarkJobFailedParams) (
 		LastError: lastError,
 	})
 }
+
+func (s *Store) ReleaseProcessingJobsByWorker(ctx context.Context, workerID string) error {
+	return s.queries.ReleaseProcessingJobsByWorker(ctx, pgtype.Text{
+		String: workerID,
+		Valid:  workerID != "",
+	})
+}

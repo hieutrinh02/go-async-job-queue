@@ -294,3 +294,19 @@ func (q *Queries) MarkJobSucceeded(ctx context.Context, id pgtype.UUID) (Job, er
 	)
 	return i, err
 }
+
+const releaseProcessingJobsByWorker = `-- name: ReleaseProcessingJobsByWorker :exec
+UPDATE jobs
+SET
+    status = 'pending',
+    locked_at = NULL,
+    locked_by = NULL,
+    updated_at = NOW()
+WHERE status = 'processing'
+  AND locked_by = $1
+`
+
+func (q *Queries) ReleaseProcessingJobsByWorker(ctx context.Context, lockedBy pgtype.Text) error {
+	_, err := q.db.Exec(ctx, releaseProcessingJobsByWorker, lockedBy)
+	return err
+}

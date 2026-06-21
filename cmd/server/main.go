@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -37,14 +38,25 @@ func main() {
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	defer stopWorker()
 
+	var workerWG sync.WaitGroup
+
+	workerIDs := make([]string, 0, cfg.WorkerCount)
+
 	for i := 1; i <= cfg.WorkerCount; i++ {
+		workerID := fmt.Sprintf("worker-%d", i)
+		workerIDs = append(workerIDs, workerID)
+
 		jobWorker := worker.New(jobStore, worker.Config{
-			ID:           fmt.Sprintf("worker-%d", i),
+			ID:           workerID,
 			BatchSize:    cfg.WorkerBatchSize,
 			PollInterval: cfg.WorkerPollInterval,
 		})
 
-		go jobWorker.Run(workerCtx)
+		workerWG.Add(1)
+		go func(jobWorker *worker.Worker) {
+			defer workerWG.Done()
+			jobWorker.Run(workerCtx)
+		}(jobWorker)
 	}
 
 	log.Printf("started %d worker(s)", cfg.WorkerCount)
@@ -77,17 +89,38 @@ func main() {
 	<-quit
 	log.Println("shutting down server...")
 
-	// Stop worker
-	stopWorker()
-
-	// Create context timeout
+	// Stop accepting new HTTP requests
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel() // should be called just before main() exits
+	defer cancel()
 
-	// Shutdown server
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatal(err)
+		log.Printf("server shutdown failed: %v", err)
+	} else {
+		log.Println("server stopped")
 	}
 
-	log.Println("server stopped")
+	// Stop workers and wait for them to exit
+	stopWorker()
+
+	workersDone := make(chan struct{})
+	go func() {
+		workerWG.Wait()
+		close(workersDone)
+	}()
+
+	select {
+	case <-workersDone:
+		log.Println("workers stopped")
+	case <-time.After(cfg.WorkerShutdownTimeout):
+		log.Printf("worker shutdown timeout exceeded after %s", cfg.WorkerShutdownTimeout)
+
+		releaseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		for _, workerID := range workerIDs {
+			if err := jobStore.ReleaseProcessingJobsByWorker(releaseCtx, workerID); err != nil {
+				log.Printf("failed to release processing jobs for %s: %v", workerID, err)
+			}
+		}
+	}
 }
